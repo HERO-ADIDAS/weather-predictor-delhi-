@@ -129,7 +129,7 @@ class WeatherModel:
         return predictions_df
 
     def display_next_day(self):
-        print(self.next_day_prediction(self.weather, self.wmodel, self.pred))
+        return (self.next_day_prediction(self.weather, self.wmodel, self.pred))
 
     # def display_next_hour(self):
     #     print("The next hour that is ", time.strftime("%H:%M:%S", time.localtime()), "The temperature will be ", self.next_hour_prediction()[0], "°C")
