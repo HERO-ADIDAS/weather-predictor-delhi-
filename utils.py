@@ -1,69 +1,19 @@
 import time 
-import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.linear_model import Ridge
-from torch.utils.data import TensorDataset, DataLoader
 import openmeteo_requests
-import numpy as np
 import requests_cache
 import pandas as pd
 from retry_requests import retry
 from datetime import timedelta
 import datetime as dt
+
 wmodel=None
 now=dt.datetime.now()
 date_180_days_ago = now - timedelta(days=155)
 str(now.date())
 
-# weather.drop('_id',axis=1,inplace=True)
-def nullpecentage(weather):
-    null_columns=weather.columns[weather.isnull().any()]
-    null_pct=weather[null_columns].isnull().sum()*100/len(weather)
-    weather=weather.ffill()
-    return null_pct
-
-def convert(weather,target,column):
-    weather[target]=weather[column].shift(-1)
-    
-# def backtest(weather,model,pred,target,start=48,step=12,):
-#     all_pred=[] 
-#     for i in range(start,weather.shape[0],step):
-#         train=weather.iloc[:i,:]
-#         test=weather.iloc[i:i+step,:]
-#         model.fit(train[pred],train[target])
-#         predict=model.predict(test[pred])
-#         predict=pd.Series(predict,index=test.index) 
-#         combined=pd.concat([predict,test[target]],axis=1)
-#         combined.columns=["predict","actual"]
-#         combined["diff"]=(combined["predict"]-combined["actual"]).abs()
-#         all_pred.append(combined)
-#     return pd.concat(all_pred)
-
-def pct_diff(old,new):
-    return (new-old)/old
-def rolling(weather,horizon,col):
-    lablel=f"rolling_{horizon}_{col}"
-    weather[lablel]=weather[col].rolling(horizon).mean()
-    weather[f"{lablel}_pct"]=pct_diff(weather[lablel],weather[col])
-    return weather
-
-def compute_rolling(weather,target,column,pred):
-    rolling_horizon=[3,6]
-    for horizon in rolling_horizon:
-        for col in [column]:
-            weather=rolling(weather,horizon,col)
-    weather=weather.iloc[6:,:]
-    weather.fillna(0,inplace=True)
-    pred=weather.columns[~weather.columns.isin([target])]
-    return weather
-    
-def call_pred(weather):
-    pred=weather.columns[~weather.columns.isin(["target_temp"])]
-    prediction=backtest(weather,wmodel,pred,"target_temp")
-    prediction.sort_values("diff",ascending=False)
-    
-    
-class weathermodel:
+class WeatherModel:
     def __init__(self):
         
         self.get_weather()
@@ -87,8 +37,6 @@ class weathermodel:
             combined["diff"]=(combined["predict"]-combined["actual"]).abs()
             all_pred.append(combined)
         return pd.concat(all_pred)
-
-
 
     def get_weather(self):
         # Setup the Open-Meteo API client with cache and retry on error
@@ -160,14 +108,10 @@ class weathermodel:
         self.weather.fillna(0,inplace=True)
         return self.weather
 
-  
-
-
     def next_day_prediction(self,weather, model, pred):
         train = weather.iloc[:-1,:]
         test = weather.iloc[-24:,:]
         
-
         start_time = time.time()
         model.fit(train[pred], train["target_temp"])
         end_time = time.time()
@@ -184,20 +128,44 @@ class weathermodel:
         
         return predictions_df
 
-    
-
-
-    def display(self):
+    def display_next_day(self):
         print(self.next_day_prediction(self.weather, self.wmodel, self.pred))
 
-    def display1(self):
-        print("the next hour that is ", time.strftime("%H:%M:%S", time.localtime()), "the temperature will be ", self.next_hour_prediction()[0], "°C")
+    # def display_next_hour(self):
+    #     print("The next hour that is ", time.strftime("%H:%M:%S", time.localtime()), "The temperature will be ", self.next_hour_prediction()[0], "°C")
 
+##########################################
+# weather.drop('_id',axis=1,inplace=True)
+def nullpecentage(weather):
+    null_columns=weather.columns[weather.isnull().any()]
+    null_pct=weather[null_columns].isnull().sum()*100/len(weather)
+    weather=weather.ffill()
+    return null_pct
 
+def convert(weather,target,column):
+    weather[target]=weather[column].shift(-1)
+    
+def pct_diff(old,new):
+    return (new-old)/old
 
+def rolling(weather,horizon,col):
+    lablel=f"rolling_{horizon}_{col}"
+    weather[lablel]=weather[col].rolling(horizon).mean()
+    weather[f"{lablel}_pct"]=pct_diff(weather[lablel],weather[col])
+    return weather
 
-
-
-
-
- 
+def compute_rolling(weather,target,column,pred):
+    rolling_horizon=[3,6]
+    for horizon in rolling_horizon:
+        for col in [column]:
+            weather=rolling(weather,horizon,col)
+    weather=weather.iloc[6:,:]
+    weather.fillna(0,inplace=True)
+    pred=weather.columns[~weather.columns.isin([target])]
+    return weather
+    
+def call_pred(weather):
+    pred=weather.columns[~weather.columns.isin(["target_temp"])]
+    prediction=WeatherModel.backtest(weather,wmodel,pred,"target_temp")
+    prediction.sort_values("diff",ascending=False)
+    
